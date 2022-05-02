@@ -1,182 +1,103 @@
-# Jasmine Sajna
-# Final Project - Game of Checkers
-import numpy as np
+# main script
+from players import Red, Black
+from board import Board
+from spaces import Node
 
-# player 1 = ♛🔴 goes first
-# player 2 = ♔⚾
-
-pl, plking, opp, oppking, allowed = ' 🔴 ', ' ♛ ', ' ⚾ ', ' ♔ ', 1
-prevpl, prevplk, prevo, prevok, prevall = ' ⚾ ', ' ♔ ', ' 🔴 ', ' ♛ ', -1
-
-count1 = 12
-count2 = 12
-
-grid = np.full((8, 8), '    ')  # 8x8 empty board
-
-
-def show_board(board):
-    """displays array (board) as a more clear board"""
-    print('\n===============CURRENT BOARD===============')
-    print('    C  1 　 2 　 3　   4　  5　   6　  7　  8')
-    print('R   ┏—–——┳—‐——┳—‐——┳—‐——┳—‐——┳—‐——┳—‐——┳—‐——┓')
-    for row in range(8):
-        print(row + 1, '  │', end=' ')
-        for node in board[row]:
-            print(node, '│', end=' ')
-        print()
-        if row != 7:
-            print('    ┣—–——╋—‐——╋—‐——╋—‐——╋—‐——╋—‐——╋—‐——╋—‐——┫')
-    print('    ┗—–——┻—‐——┻—‐——┻—‐——┻—‐——┻—‐——┻—‐——┻—‐——┛')
-
-
-def initialize_board(board):
-    """function to reset board"""
-    for i in range(8):
-        for j in range(3):  # Player 🔴 on first half of board
-            if (i + j) % 2 == 1:
-                board[i][j] = ' 🔴 '
-
-        for j in range(5, 8):  # player ⚾ on second half of board
-            if (i + j) % 2 == 1:
-                board[i][j] = ' ⚾ '
-
-
-def get_piece(board, player, playerkingpc, opp, oppking, allowed):
+def select_pc(player, board, opp):
     """function to check if a selected piece is valid
-    :param board: numpy array of grid
-    :param player: string of player 🔴 or ⚾
-    :param playerkingpc: string of the king version of player
-    :param opp: opponent string
-    :param oppking: opponent's king string
-    :param allowed: int (1 or -1), represents how player can move through board's columns
+    :param player: class type Red or Black
+    :param board: class type Board
+    :param opp: class type of opponent (Red or Black)
     """
-    value = False
-    while not value:
+    select = False
+    # creates a loop until the selected piece is valid
+    while not select:
         try:
-            print(f"****Player {player}'s turn****")
-            piece = input('Select piece (R,C): ')
-            row = int(piece[1]) - 1
-            col = int(piece[3]) - 1
-            marker = board[row][col]  # gets the string in place at chosen spot
-            if marker != player and marker != playerkingpc:
+            print(f"****Player {player.name}'s turn****")
+            piece = input('Select piece "(R,C)": ')
+            srow = int(piece[1]) - 1
+            scol = int(piece[3]) - 1
+
+            # call function to check if type at selected spot is player's
+            if not correct_sel(player, board.grid, srow, scol):
                 print(f'{piece} is not your piece! Enter again!')
-                print(f'marker is {marker}, player is {player}')
                 continue
-            else:  # condition that the selected piece is the player's
-                board[row][col] = '    '   # clear the position
-                value = True
-        except:
-            TypeError("Enter valid type for piece location!")
+            elif board.check_movable(srow, scol, opp):  # uses board method to check that piece can move
+                select = True
 
-    playerking = marker == playerkingpc  # true or false value based on if chosen piece is a king
-    move_piece(board, marker, playerking, opp, oppking, row, col, allowed)  # begins moving piece when selected is ok
+        except ValueError:  # case that user enter invalid type ex: (j,s)
+            print('Invalid input type!')
 
+    mrow, mcol = move_pc(board, srow, scol, opp)
+    board.move_pc(srow, scol, mrow, mcol)
 
-def move_piece(board, player, playerking, opp, oppking, srow, scol, allowed):
-    """function to change a node to a piece, all parameters are same as get_piece except for below:
-    :param player: string of selected piece (can be king)
-    :param playerking: True or False (is piece a king)
-    :param srow: int selected piece row
-    :param scol: int selected piece column
+def move_pc(board, srow, scol, opp):
+    """ function to check if move position spot is valid
+    :param board: type Board
+    :param srow: int of current spot's row
+    :param scol: int of current spot's col
+    :param opp: opponent's type (Red or Black)
+    :return: mrow, mcol - int of chosen move spot row and column
     """
+    moved = False
+    crowned = board.grid[srow][scol].crowned
+    allowed = board.grid[srow][scol].allowed
 
-    value = False
-    while not value:   # loop that breaks when move position is considered valid
+    # loop to confirm that move position is valid
+    while not moved:
         try:
-            spot = input('Move to (R,C): ')
+            # grab move spot from user
+            spot = input('Move to "(R,C)": ')
             mrow = int(spot[1]) - 1
             mcol = int(spot[3]) - 1
-            move = board[mrow][mcol]
-            if move != '    ' and (mcol-scol) == allowed:  # if move spot not empty
+
+            if not correct_sel(Node, board.grid, mrow, mcol):  # if move spot not empty (not Node type at spot)
                 print(f'Position {spot} taken! Try again!')
                 continue
-            else:
-                if abs(srow - mrow) == 1:  # if player is moving only 1 spot away
-                    # check if direction of move is valid (kings go both ways, originals go only in allowed direction)
-                    if (mcol - scol) == allowed or (abs(mcol - scol) == 1 and playerking):
-                        board[mrow][mcol] = player  # valid, so change position to hold piece
-                        value = True
-                    else:
-                        print('Not valid movement!')
-                        continue
-                elif abs(srow - mrow) == 2:  # if player is trying to make a jump
-                    # check direction considering king or not
-                    if (mcol - scol) == (2 * allowed) or (abs(mcol - scol) == 2 and playerking):
-                        midrow = (srow + mrow) // 2
-                        midcol = (scol + mcol) // 2
-                        btwn = board[midrow][midcol]
-                        if btwn == opp or btwn == oppking:  # compares piece being jumped over to check if opponent
-                            board[mrow][mcol] = player
-                            delete_piece(board, opp, midrow, midcol)  # delete fn to remove the opponent's piece
-
-                            value = True
-                        else:
-                            print('Invalid Jump!')  # the jump is not over opponent piece
-                            continue
+            elif abs(srow - mrow) == 1:  # if player is trying to move only directly next to selected spot
+                if (mcol - scol) == allowed or (abs(mcol - scol)==1 and crowned):  # check direction is allowed
+                    return mrow, mcol
                 else:
-                    print('NOT A POSITION')  # player tries to make jump larger than 2
-        except TypeError as e:
-            print(str(e))
-            print('Invalid!')
-    check_king(board, mrow, mcol, allowed)
+                    print('Invalid jump!')
+                    continue
+            elif abs(srow-mrow) == 2:  # player is trying to jump over another piece
+                if (mcol - scol) == (2*allowed) or (abs(mcol - scol) == 2 and crowned):  # check if direction is allowed
+                    jrow = (srow + mrow) // 2
+                    jcol = (scol + mcol) // 2
+                    if correct_sel(opp, board.grid, jrow, jcol):  # check if the jumped over piece is the opponent's
+                        board.delete_pc(jrow, jcol)
+                        return mrow, mcol
+                    else:  # piece is not opponents
+                        print('Invalid Jump!')
+                        continue
+            else:
+                print('NOT A POSITION')
+        except ValueError:
+            print('Invalid input type!')
 
 
-def delete_piece(board, player, row, col):
-    """function to empty a position at node (called when jumped over), and lower register count of pieces
-    :param board: grid array
-    :param player: string at current spot
-    :param row: int row of jumped piece
-    :param col: int col of jumped piece
+def correct_sel(expected_type, grid, row, col):
+    """ function for checking if a spot is the piece type it needs to be
+    :param expected_type:  type Red, Black, or Node
+    :param grid: type Board, of grid
+    :param row: int of row
+    :param col: int of col
+    :return: True or False (that piece is correct)
     """
-    global count1
-    global count2
-    board[row][col] = '    '  # clears position
-    # adjust the count of pieces
-    if player == ' 🔴 ' or player == ' ♛ ':
-        count1 = count1 - 1
-    elif player == ' ⚾ ' or player == ' ♔ ':
-        count2 = count2 - 1
-
-
-def check_win():
-    """Function to check if board is all one player
-    :return: True or Falase
-    """
-    global count1
-    global count2
-    if count1 == 0:
-        print('Player  ⚾  Won!')
-        return True
-    elif count2 == 0:
-        print('Player  🔴  Won!')
+    if type(grid[row][col]) == expected_type:
         return True
     else:
         return False
 
+boards = Board()
+boards.initialize_board()
+player = Red
+opp = Black
 
-def check_king(board, row, col, allowed):
-    """ function to check if a piece has reached the opposite edge
-    :param board: grid array
-    :param row: int row of piece
-    :param col: int col of piece
-    :param allowed: int -1 or 1 to identify which piece to make king
-    """
-    if allowed == -1 and col == 0:
-        board[row][col] = ' ♔ '
-    if allowed == 1 and col == 7:
-        board[row][col] = ' ♛ '
-
-
-initialize_board(grid)
 win = False
-while not win:  # main loop to alternate turns
+while not win:
+    boards.show_board()
+    select_pc(player, boards, opp)  # get player to choose piece, which calls move piece methods and functions
 
-    show_board(grid)
-    get_piece(grid, pl, plking, opp, oppking, allowed)
-
-    # switching previous player components to current player
-    temppl, templk, tempopp, tempok, tempall = pl, plking, opp, oppking, allowed
-    pl, plking, opp, oppking, allowed = prevpl, prevplk, prevo, prevok, prevall
-    prevpl, prevplk, prevo, prevok, prevall = temppl, templk, tempopp, tempok, tempall
-    win = check_win()
-
+    player, opp = opp, player  # switch off current player and opponent
+    win = boards.check_win()
